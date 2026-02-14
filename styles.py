@@ -8,6 +8,8 @@ THEME = {
     "keyword": "#569cd6",
     "string": "#ce9178",
     "comment": "#6a9955",
+    "number": "#b5cea8",
+    "operator": "#d4d4d4",
 }
 
-KEYWORDS = ["func", "var", "if", "else", "while", "return", "print", "import", "int", "string", "bool"]
+KEYWORDS = ["func", "var", "if", "else", "while", "return", "print", "import", "int", "string", "bool", "true", "false"]
