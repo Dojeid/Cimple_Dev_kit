@@ -1,0 +1,11 @@
+{
+  "name": "cimple-edit",
+  "version": "1.0.0",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^40.4.1"
+  }
+}

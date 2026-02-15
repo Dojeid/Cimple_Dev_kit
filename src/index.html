@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'">
+    <title>Cimple Edit | Code Editor</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;600&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-logo">C</div>
+            <div class="sidebar-items">
+                <div class="sidebar-item active" title="Editor">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                </div>
+                <div class="sidebar-item" title="Search">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                </div>
+            </div>
+            <div class="sidebar-footer">
+                <div id="status-dot" class="status-dot"></div>
+            </div>
+        </aside>
+
+        <main class="editor-main">
+            <header class="editor-header">
+                <div class="tabs-container">
+                    <div class="tab active">
+                        <span class="tab-icon">js</span>
+                        <span class="tab-title">index.js</span>
+                        <span class="tab-close">×</span>
+                    </div>
+                </div>
+                <div class="window-controls-spacer"></div>
+            </header>
+
+            <div class="editor-container">
+                <div class="line-numbers" id="line-numbers">1</div>
+                <textarea id="code-editor" spellcheck="false" placeholder="Start typing your code here..."></textarea>
+            </div>
+
+            <footer class="editor-footer">
+                <div class="footer-left">
+                    <span id="cursor-pos">Ln 1, Col 1</span>
+                </div>
+                <div class="footer-right">
+                    <span>UTF-8</span>
+                    <span>JavaScript</span>
+                </div>
+            </footer>
+        </main>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+
+</html>
