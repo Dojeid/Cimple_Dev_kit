@@ -3,7 +3,6 @@
  */
 import { state } from './state.js';
 import * as editor from './editor.js';
-import * as workspace from './workspace.js';
 
 const { ipcRenderer } = require('electron');
 const path = require('path');
@@ -64,7 +63,8 @@ function escapeHtml(t) {
 export async function openFolder() {
   const newPath = await ipcRenderer.invoke('open-folder');
   if (!newPath) return;
-  await workspace.setWorkspacePath(newPath);
+  const workspaceModule = await import('./workspace.js');
+  await workspaceModule.setWorkspacePath(newPath);
   const treeEl = document.getElementById('file-tree');
   const emptyEl = document.getElementById('explorer-empty');
   if (treeEl && emptyEl) {
@@ -74,7 +74,7 @@ export async function openFolder() {
     await loadDir(newPath, treeEl);
   }
   document.getElementById('sidebar-title').textContent = 'EXPLORER';
-  workspace.notify('folder-refreshed');
+  workspaceModule.notify('folder-refreshed');
 }
 
 export async function openFile(filePath) {
@@ -127,5 +127,6 @@ export async function refreshFolder() {
     treeEl.innerHTML = '';
     await loadDir(path, treeEl);
   }
-  await workspace.refreshGit();
+  const workspaceModule = await import('./workspace.js');
+  await workspaceModule.refreshGit();
 }

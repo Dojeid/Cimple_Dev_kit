@@ -123,10 +123,30 @@ if (editorEl) {
 }
 
 // Global shortcuts
+function cycleEditorTabs(direction = 1) {
+  const tabs = state.tabs;
+  if (!tabs.length) return;
+  const currentIndex = tabs.findIndex(t => t.id === state.activeTabId);
+  if (currentIndex === -1) return;
+  const nextIndex = (currentIndex + direction + tabs.length) % tabs.length;
+  editor.switchTab(tabs[nextIndex].id);
+}
+
 document.addEventListener('keydown', (e) => {
   if (e.ctrlKey && e.shiftKey && e.key === 'P') { e.preventDefault(); commandPalette.show(); return; }
   if (e.ctrlKey && e.key === 'K' && e.key === 'Z') { e.preventDefault(); zenMode.toggle(); return; }
   if (e.ctrlKey && e.key === 'K') return; // K chord
+  if (e.ctrlKey && e.key === 'Tab') {
+    e.preventDefault();
+    cycleEditorTabs(e.shiftKey ? -1 : 1);
+    return;
+  }
+  if (e.ctrlKey && !e.shiftKey && e.key === 'w') {
+    e.preventDefault();
+    const tab = editor.getActiveTab();
+    if (tab) editor.closeTab(tab.id);
+    return;
+  }
   if (e.ctrlKey && e.key === 's') {
     e.preventDefault(); (async () => {
       const tab = editor.getActiveTab();

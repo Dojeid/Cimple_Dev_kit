@@ -674,6 +674,9 @@ body {
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-app-region: no-drag;
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--glass-border);
+    padding-left: 8px;
 }
 
 .tabs-container::-webkit-scrollbar {
@@ -698,6 +701,7 @@ body {
 
 .tab:hover {
     color: var(--text);
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .tab.active {
@@ -1158,51 +1162,74 @@ body {
 }
 
 .terminal-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    height: 42px;
     background: var(--header-bg);
     border-bottom: 1px solid var(--glass-border);
-    height: 38px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 12px;
     gap: 12px;
-    font-size: 0.85rem;
 }
 
-.terminal-tabs {
+.terminal-tab-strip {
     display: flex;
     align-items: center;
     gap: 4px;
+    overflow-x: auto;
+    flex: 1;
 }
 
 .terminal-tab {
-    border: 1px solid var(--glass-border);
+    padding: 6px 12px;
     border-radius: 4px;
-    background: rgba(255, 255, 255, 0.02);
-    color: var(--text);
-    padding: 6px 10px;
+    border: 1px solid transparent;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     cursor: pointer;
+    min-width: 120px;
+    background: transparent;
+    transition: border 0.2s, background 0.2s;
 }
 
 .terminal-tab.active {
     border-color: var(--primary);
-    background: var(--editor-bg);
+    background: rgba(130, 87, 229, 0.2);
 }
 
 .terminal-tab-title {
     font-family: var(--font-mono);
-    font-size: 0.8rem;
+    font-size: 0.85rem;
+    color: var(--text);
 }
 
 .terminal-tab-status {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     color: var(--text-muted);
     padding: 2px 4px;
     border-radius: 3px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.terminal-tab-close {
+    border: none;
+    background: transparent;
+    color: var(--text);
+    font-size: 0.95rem;
+    cursor: pointer;
+}
+
+.terminal-tab-close:hover {
+    color: var(--primary);
+}
+
+.terminal-tab-add {
+    padding: 0 10px;
+    border-style: dashed;
+    min-width: 32px;
+    justify-content: center;
+    font-weight: 600;
 }
 
 .terminal-actions {
@@ -1229,6 +1256,48 @@ body {
     background: var(--surface);
 }
 
+.terminal-output-wrapper {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    background: var(--editor-bg);
+    border-radius: 0 0 6px 6px;
+    border: 1px solid var(--glass-border);
+    border-top: none;
+    overflow: hidden;
+}
+
+.terminal-input-row {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-top: 1px solid var(--glass-border);
+    gap: 8px;
+}
+
+.terminal-input {
+    flex: 1;
+    border: 1px solid var(--glass-border);
+    border-radius: 4px;
+    padding: 6px 10px;
+    background: var(--sidebar-bg);
+    font-family: var(--font-mono);
+    color: var(--text);
+    font-size: 0.9rem;
+}
+
+.terminal-input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.terminal-input-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    min-width: 120px;
+    text-align: right;
+}
+
 .terminal-output,
 .output-log,
 .debug-log {
@@ -1246,21 +1315,6 @@ body {
     border-radius: 0 0 6px 6px;
     padding: 12px;
     border-top: none;
-}
-
-.terminal-input {
-    padding: 6px 10px;
-    background: var(--editor-bg);
-    border: 1px solid var(--glass-border);
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size: 0.85rem;
-    margin-top: 4px;
-}
-
-.terminal-input:focus {
-    outline: none;
-    border-color: var(--primary);
 }
 
 /* Source / Extensions panels */

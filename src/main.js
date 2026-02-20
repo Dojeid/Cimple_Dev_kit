@@ -25,10 +25,10 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => mainWindow.show());
 
   mainWindow.on('closed', () => {
-    if (terminalProcess) {
-      terminalProcess.kill();
-      terminalProcess = null;
+    for (const proc of terminalProcesses.values()) {
+      proc.kill();
     }
+    terminalProcesses.clear();
     mainWindow = null;
   });
 }
@@ -83,48 +83,72 @@ ipcMain.handle('file-exists', async (_, filePath) => {
   }
 });
 
-// Terminal: spawn shell process
-const shell = process.platform === 'win32' ? 'powershell.exe' : '/bin/bash';
-let terminalProcess = null;
+const terminalProcesses = new Map();
+const fallbackShell = process.platform === 'win32'
+  ? (process.env.POWERSHELL || process.env.COMSPEC || 'powershell.exe')
+  : (process.env.SHELL || '/bin/bash');
+const fallbackIsPowerShell = /powershell|pwsh/i.test(fallbackShell);
+const fallbackIsCmd = /cmd(?:\\.exe)?$/i.test(fallbackShell);
+const fallbackArgs = fallbackIsPowerShell ? ['-NoLogo', '-NoExit'] : (fallbackIsCmd ? ['/K'] : []);
 
-ipcMain.handle('terminal-spawn', async (_, cwd) => {
-  if (terminalProcess) {
-    terminalProcess.kill();
-    terminalProcess = null;
+function spawnTerminalProcess(sessionId, options = {}) {
+  const shellCommand = options.shell || fallbackShell;
+  const args = Array.isArray(options.args) && options.args.length ? options.args : fallbackArgs;
+  if (terminalProcesses.has(sessionId)) {
+    const prev = terminalProcesses.get(sessionId);
+    prev.kill();
+    terminalProcesses.delete(sessionId);
   }
-  terminalProcess = spawn(shell, process.platform === 'win32' ? ['-NoExit'] : [], {
-    cwd: cwd || process.cwd(),
-    env: process.env,
-    shell: true
+  const cwd = options.cwd || process.cwd();
+  const proc = spawn(shellCommand, args, {
+    cwd,
+    env: process.env
   });
-  return { pid: terminalProcess.pid };
+  terminalProcesses.set(sessionId, proc);
+  proc.stdout.on('data', (data) => {
+    mainWindow?.webContents?.send('terminal-data', { sessionId, data: data.toString() });
+  });
+  proc.stderr.on('data', (data) => {
+    mainWindow?.webContents?.send('terminal-data', { sessionId, data: data.toString() });
+  });
+  proc.on('exit', (code) => {
+    terminalProcesses.delete(sessionId);
+    mainWindow?.webContents?.send('terminal-exit', { sessionId, code });
+  });
+  return proc;
+}
+
+ipcMain.handle('terminal-spawn', async (_, options = {}) => {
+  const sessionId = options.sessionId;
+  if (!sessionId) throw new Error('Missing sessionId');
+  spawnTerminalProcess(sessionId, options);
+  return { pid: terminalProcesses.get(sessionId)?.pid };
 });
 
-ipcMain.handle('terminal-write', (_, data) => {
-  if (terminalProcess && terminalProcess.stdin.writable) {
-    terminalProcess.stdin.write(data);
+ipcMain.handle('terminal-write', (_, payload) => {
+  const sessionId = payload?.sessionId;
+  const command = payload?.command;
+  const proc = terminalProcesses.get(sessionId);
+  if (proc && proc.stdin.writable) {
+    proc.stdin.write(command);
   }
 });
 
-ipcMain.handle('terminal-kill', () => {
-  if (terminalProcess) {
-    terminalProcess.kill();
-    terminalProcess = null;
+ipcMain.handle('terminal-kill', (_, payload) => {
+  const sessionId = payload?.sessionId;
+  const proc = terminalProcesses.get(sessionId);
+  if (proc) {
+    proc.kill();
+    terminalProcesses.delete(sessionId);
   }
 });
 
-// Forward terminal stdout/stderr to renderer
-ipcMain.on('terminal-ready', () => {
-  if (!terminalProcess) return;
-  terminalProcess.stdout.on('data', (data) => {
-    mainWindow?.webContents?.send('terminal-data', data.toString());
-  });
-  terminalProcess.stderr.on('data', (data) => {
-    mainWindow?.webContents?.send('terminal-data', data.toString());
-  });
-  terminalProcess.on('exit', (code) => {
-    mainWindow?.webContents?.send('terminal-exit', code);
-  });
+ipcMain.handle('terminal-sigint', (_, payload) => {
+  const sessionId = payload?.sessionId;
+  const proc = terminalProcesses.get(sessionId);
+  if (proc) {
+    proc.kill('SIGINT');
+  }
 });
 
 // Git
@@ -188,6 +212,9 @@ app.on('activate', () => {
 });
 
 app.on('window-all-closed', () => {
-  if (terminalProcess) terminalProcess.kill();
+  for (const proc of terminalProcesses.values()) {
+    proc.kill();
+  }
+  terminalProcesses.clear();
   if (process.platform !== 'darwin') app.quit();
 });

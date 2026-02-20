@@ -243,33 +243,33 @@
           <div class="panel-tab" data-tab="output">Output</div>
           <div class="panel-tab" data-tab="debug">Debug Console</div>
         </div>
-        <div class="panel-content">
+      <div class="panel-content">
         <div id="panel-terminal" class="panel-view active">
           <div class="terminal-toolbar">
-            <div class="terminal-tabs">
-              <button class="terminal-tab active">
-                <span class="terminal-tab-title" id="terminal-tab-title">powershell</span>
-                <span class="terminal-tab-status" id="terminal-tab-status">Running</span>
-              </button>
-              <button class="terminal-toolbar-btn" id="terminal-new-btn" title="New Terminal">+</button>
-            </div>
+            <div class="terminal-tab-strip" id="terminal-tab-strip"></div>
             <div class="terminal-actions">
+              <button class="terminal-toolbar-btn" id="terminal-new-btn" title="New Terminal">＋</button>
               <button class="terminal-toolbar-btn" id="terminal-split-btn" title="Split Terminal">▥</button>
               <button class="terminal-toolbar-btn" id="terminal-clear-btn" title="Clear (Ctrl+L)">🗑</button>
               <button class="terminal-toolbar-btn" id="terminal-kill-btn" title="Kill Terminal">⛔</button>
               <button class="terminal-toolbar-btn" id="terminal-restart-btn" title="Restart Terminal">↻</button>
             </div>
           </div>
-          <pre id="terminal-output" class="terminal-output"></pre>
-          <input type="text" id="terminal-input" class="terminal-input" placeholder="Type here (Enter to send)..." />
-        </div>
-          <div id="panel-output" class="panel-view">
-            <pre id="output-log" class="output-log"></pre>
-          </div>
-          <div id="panel-debug" class="panel-view">
-            <pre class="debug-log">Debug console placeholder</pre>
+          <div class="terminal-output-wrapper">
+            <pre id="terminal-output" class="terminal-output"></pre>
+            <div class="terminal-input-row">
+              <input type="text" id="terminal-input" class="terminal-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+              <span class="terminal-input-hint" id="terminal-input-hint"></span>
+            </div>
           </div>
         </div>
+        <div id="panel-output" class="panel-view">
+          <pre id="output-log" class="output-log"></pre>
+        </div>
+        <div id="panel-debug" class="panel-view">
+          <pre class="debug-log">Debug console placeholder</pre>
+        </div>
+      </div>
       </div>
 
       <footer class="editor-footer">

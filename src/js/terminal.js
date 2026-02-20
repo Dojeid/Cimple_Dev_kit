@@ -2,106 +2,289 @@
  * Integrated Terminal styled like VS Code
  */
 import * as fileExplorer from './file-explorer.js';
+import * as workspace from './workspace.js';
 
 const { ipcRenderer } = require('electron');
 
-const shellName = process.platform === 'win32' ? 'pwsh' : 'bash';
+const DEFAULT_SHELL = process.platform === 'win32'
+  ? (process.env.POWERSHELL || process.env.COMSPEC || 'powershell.exe')
+  : (process.env.SHELL || 'bash');
+const isPowerShell = /powershell|pwsh/i.test(DEFAULT_SHELL);
+const isCmd = /cmd\.exe$/i.test(DEFAULT_SHELL);
+const SHELL_ARGS = isPowerShell ? ['-NoLogo', '-NoExit'] : (isCmd ? ['/K'] : []);
+const SHELL_DISPLAY = DEFAULT_SHELL.split(/[\\/]/).pop() || DEFAULT_SHELL;
 
-let terminalOutput = null;
-let terminalInput = null;
-let terminalTabTitle = null;
-let terminalTabStatus = null;
-let terminalClearBtn = null;
-let terminalKillBtn = null;
-let terminalRestartBtn = null;
-let terminalNewBtn = null;
-let terminalSplitBtn = null;
+const MAX_OUTPUT = 50000;
+const HISTORY_LIMIT = 120;
 
-function appendOutput(text) {
+const tabStrip = document.getElementById('terminal-tab-strip');
+const terminalOutput = document.getElementById('terminal-output');
+const terminalInput = document.getElementById('terminal-input');
+const terminalHint = document.getElementById('terminal-input-hint');
+const terminalClearBtn = document.getElementById('terminal-clear-btn');
+const terminalKillBtn = document.getElementById('terminal-kill-btn');
+const terminalRestartBtn = document.getElementById('terminal-restart-btn');
+const terminalNewBtn = document.getElementById('terminal-new-btn');
+const terminalSplitBtn = document.getElementById('terminal-split-btn');
+
+const sessions = new Map();
+let activeSessionId = null;
+
+function getDefaultCwd() {
+  return workspace.getWorkspacePath() || process.cwd?.() || '.';
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function setOutput(text) {
   if (!terminalOutput) return;
-  terminalOutput.textContent += text;
+  terminalOutput.textContent = text;
   terminalOutput.scrollTop = terminalOutput.scrollHeight;
 }
 
-function clearOutput() {
-  if (!terminalOutput) return;
-  terminalOutput.textContent = '';
+function renderTabs() {
+  if (!tabStrip) return;
+  tabStrip.innerHTML = '';
+  for (const session of sessions.values()) {
+    const tab = document.createElement('div');
+    tab.className = 'terminal-tab' + (session.id === activeSessionId ? ' active' : '');
+    tab.dataset.sessionId = session.id;
+    tab.innerHTML = `
+      <span class="terminal-tab-title">${escapeHtml(session.title)}</span>
+      <span class="terminal-tab-status">${escapeHtml(session.status)}</span>
+      <button class="terminal-tab-close" aria-label="Close terminal tab">×</button>
+    `;
+    tab.addEventListener('click', () => selectSession(session.id));
+    tab.querySelector('.terminal-tab-close')?.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      closeSession(session.id);
+    });
+    tabStrip.appendChild(tab);
+  }
+  const add = document.createElement('button');
+  add.className = 'terminal-tab terminal-tab-add';
+  add.textContent = '+';
+  add.addEventListener('click', () => createSession());
+  tabStrip.appendChild(add);
 }
 
-function updateTabTitle() {
-  if (!terminalTabTitle) return;
-  terminalTabTitle.textContent = shellName;
+function selectSession(id) {
+  if (!sessions.has(id)) return;
+  activeSessionId = id;
+  const session = sessions.get(id);
+  setOutput(session.output);
+  terminalInput.value = '';
+  updateHint(session, '');
+  renderTabs();
+  requestAnimationFrame(() => terminalInput?.focus());
 }
 
-function updateTabStatus(text) {
-  if (!terminalTabStatus) return;
-  terminalTabStatus.textContent = text;
+function closeSession(id) {
+  const session = sessions.get(id);
+  if (!session) return;
+  ipcRenderer.invoke('terminal-kill', { sessionId: id });
+  sessions.delete(id);
+  if (activeSessionId === id) {
+    const remaining = Array.from(sessions.keys());
+    activeSessionId = remaining.length ? remaining[remaining.length - 1] : null;
+  }
+  renderTabs();
+  if (activeSessionId) selectSession(activeSessionId);
+  else setOutput('');
 }
 
-export async function spawnTerminal() {
-  const cwd = fileExplorer.getWorkspacePath() || process.cwd?.() || '.';
-  updateTabStatus('Starting...');
-  await ipcRenderer.invoke('terminal-spawn', cwd);
-  updateTabStatus('Running');
+function updateHint(session, prefix) {
+  if (!terminalHint || !session) return;
+  if (!prefix) {
+    terminalHint.textContent = '';
+    return;
+  }
+  const match = session.history.slice().reverse().find(entry => entry.toLowerCase().startsWith(prefix.toLowerCase()) && entry !== prefix);
+  terminalHint.textContent = match ? match.slice(prefix.length) : '';
+}
+
+function navigateHistory(session, delta) {
+  if (!terminalInput || !session || !session.history.length) return;
+  if (session.historyIndex == null) session.historyIndex = session.history.length;
+  session.historyIndex = Math.min(Math.max(0, session.historyIndex + delta), session.history.length);
+  if (session.historyIndex === session.history.length) {
+    terminalInput.value = '';
+  } else {
+    terminalInput.value = session.history[session.historyIndex];
+  }
+  updateHint(session, terminalInput.value);
+}
+
+function pushHistory(session, command) {
+  if (!session || !command) return;
+  const trimmed = command.trim();
+  if (!trimmed) return;
+  if (session.history[session.history.length - 1] !== trimmed) {
+    session.history.push(trimmed);
+    if (session.history.length > HISTORY_LIMIT) session.history.shift();
+  }
+  session.historyIndex = session.history.length;
+}
+
+async function spawnSession(session) {
+  session.status = 'Starting';
+  session.output = '';
+  session.historyIndex = session.history.length;
+  renderTabs();
+  try {
+    await ipcRenderer.invoke('terminal-spawn', { sessionId: session.id, cwd: session.cwd, shell: DEFAULT_SHELL, args: SHELL_ARGS });
+    session.status = 'Running';
+  } catch (err) {
+    session.status = 'Error';
+    session.output += `\nFailed to start: ${err.message}\n`;
+  }
+  renderTabs();
+  if (activeSessionId === session.id) setOutput(session.output);
+}
+
+function createSession(options = {}) {
+  const id = 'term-' + Date.now();
+  const cwd = options.cwd || getDefaultCwd();
+  const session = {
+    id,
+    title: SHELL_DISPLAY,
+    status: 'Starting',
+    cwd,
+    output: '',
+    history: [],
+    historyIndex: 0,
+  };
+  sessions.set(id, session);
+  activeSessionId = id;
+  selectSession(id);
+  spawnSession(session);
+  return session;
+}
+
+function handleOutput(sessionId, chunk) {
+  const session = sessions.get(sessionId);
+  if (!session) return;
+  session.output = (session.output + chunk).slice(-MAX_OUTPUT);
+  if (activeSessionId === sessionId) setOutput(session.output);
+}
+
+function handleExit(sessionId, code) {
+  const session = sessions.get(sessionId);
+  if (!session) return;
+  session.status = code === 0 ? 'Exited' : `Exit ${code}`;
+  renderTabs();
+}
+
+function getActiveSession() {
+  return activeSessionId ? sessions.get(activeSessionId) : null;
+}
+
+function clearSessionOutput() {
+  const session = getActiveSession();
+  if (!session) return;
+  session.output = '';
+  if (activeSessionId) setOutput('');
+}
+
+function killActiveSession() {
+  const session = getActiveSession();
+  if (!session) return;
+  ipcRenderer.invoke('terminal-kill', { sessionId: session.id });
+  session.status = 'Killed';
+  renderTabs();
+}
+
+function restartActiveSession() {
+  const session = getActiveSession();
+  if (!session) return;
+  ipcRenderer.invoke('terminal-kill', { sessionId: session.id }).finally(() => {
+    session.output = '';
+    session.status = 'Restarting';
+    renderTabs();
+    spawnSession(session);
+  });
+}
+
+function splitActiveSession() {
+  const session = getActiveSession();
+  if (!session) return;
+  createSession({ cwd: session.cwd });
+}
+
+function sendCommand(command) {
+  const session = getActiveSession();
+  if (!session) return;
+  pushHistory(session, command);
+  updateHint(session, '');
+  ipcRenderer.invoke('terminal-write', { sessionId: session.id, command: command + '\n' });
+}
+
+function sendSigint() {
+  const session = getActiveSession();
+  if (!session) return;
+  ipcRenderer.invoke('terminal-sigint', { sessionId: session.id });
 }
 
 export function init() {
-  terminalOutput = document.getElementById('terminal-output');
-  terminalInput = document.getElementById('terminal-input');
-  terminalTabTitle = document.getElementById('terminal-tab-title');
-  terminalTabStatus = document.getElementById('terminal-tab-status');
-  terminalClearBtn = document.getElementById('terminal-clear-btn');
-  terminalKillBtn = document.getElementById('terminal-kill-btn');
-  terminalRestartBtn = document.getElementById('terminal-restart-btn');
-  terminalNewBtn = document.getElementById('terminal-new-btn');
-  terminalSplitBtn = document.getElementById('terminal-split-btn');
-
-  updateTabTitle();
-
-  spawnTerminal();
-
-  ipcRenderer.on('terminal-data', (_, data) => {
-    appendOutput(data);
+  ipcRenderer.on('terminal-data', (_, payload) => {
+    if (payload?.sessionId && payload.data) {
+      handleOutput(payload.sessionId, payload.data);
+    }
   });
 
-  ipcRenderer.on('terminal-exit', (_, code) => {
-    appendOutput(`\n[Process exited with code ${code}]\n`);
-    updateTabStatus(code === 0 ? 'Exited' : `Exit ${code}`);
+  ipcRenderer.on('terminal-exit', (_, payload) => {
+    if (payload?.sessionId) {
+      handleExit(payload.sessionId, payload.code);
+    }
   });
 
-  terminalInput?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const value = terminalInput.value;
-      const trimmed = value.trim();
-      if (trimmed) {
-        ipcRenderer.invoke('terminal-write', value + '\n');
-      } else {
-        ipcRenderer.invoke('terminal-write', '\n');
+  renderTabs();
+  if (!sessions.size) createSession();
+
+  terminalInput?.addEventListener('input', () => {
+    const session = getActiveSession();
+    updateHint(session, terminalInput.value);
+  });
+
+  terminalInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const text = terminalInput.value;
+      if (text.trim().length === 0) {
+        sendCommand('');
+        terminalInput.value = '';
+        return;
       }
+      sendCommand(text);
       terminalInput.value = '';
     }
-    if (e.key === 'l' && e.ctrlKey) {
-      e.preventDefault();
-      clearOutput();
+    if (event.key === 'l' && event.ctrlKey) {
+      event.preventDefault();
+      clearSessionOutput();
+    }
+    if (event.key === 'c' && event.ctrlKey) {
+      event.preventDefault();
+      sendSigint();
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      navigateHistory(getActiveSession(), -1);
+    }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      navigateHistory(getActiveSession(), 1);
     }
   });
 
-  terminalClearBtn?.addEventListener('click', () => clearOutput());
-  terminalKillBtn?.addEventListener('click', () => {
-    ipcRenderer.invoke('terminal-kill');
-    updateTabStatus('Killed');
-  });
-  terminalRestartBtn?.addEventListener('click', async () => {
-    await ipcRenderer.invoke('terminal-kill');
-    clearOutput();
-    spawnTerminal();
-  });
-  const respawnTerminal = async () => {
-    await ipcRenderer.invoke('terminal-kill');
-    clearOutput();
-    spawnTerminal();
-  };
-  terminalNewBtn?.addEventListener('click', respawnTerminal);
-  terminalSplitBtn?.addEventListener('click', respawnTerminal);
+  terminalClearBtn?.addEventListener('click', clearSessionOutput);
+  terminalKillBtn?.addEventListener('click', killActiveSession);
+  terminalRestartBtn?.addEventListener('click', restartActiveSession);
+  terminalSplitBtn?.addEventListener('click', splitActiveSession);
+  terminalNewBtn?.addEventListener('click', () => createSession());
+
+  // events already wired above
 }
