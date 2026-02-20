@@ -1157,6 +1157,78 @@ body {
     display: flex;
 }
 
+.terminal-toolbar {
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--glass-border);
+    height: 38px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 12px;
+    gap: 12px;
+    font-size: 0.85rem;
+}
+
+.terminal-tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.terminal-tab {
+    border: 1px solid var(--glass-border);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text);
+    padding: 6px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.terminal-tab.active {
+    border-color: var(--primary);
+    background: var(--editor-bg);
+}
+
+.terminal-tab-title {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+}
+
+.terminal-tab-status {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    padding: 2px 4px;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.terminal-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.terminal-toolbar-btn {
+    border: none;
+    background: transparent;
+    color: var(--text);
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+}
+
+.terminal-toolbar-btn:hover {
+    background: var(--surface);
+}
+
 .terminal-output,
 .output-log,
 .debug-log {
@@ -1167,6 +1239,13 @@ body {
     color: var(--text);
     white-space: pre-wrap;
     margin: 0;
+}
+
+.panel-view #terminal-output {
+    background: var(--editor-bg);
+    border-radius: 0 0 6px 6px;
+    padding: 12px;
+    border-top: none;
 }
 
 .terminal-input {
