@@ -1,0 +1,213 @@
+/**
+ * Editor core - Tabs, content, syntax highlight, line numbers, cursor
+ */
+import { state } from './state.js';
+import { highlightCimple, escapeHtml } from './syntax.js';
+import * as fileExplorer from './file-explorer.js';
+
+const editorEl = document.getElementById('code-editor');
+const lineNumbersEl = document.getElementById('line-numbers');
+const highlightLayer = document.getElementById('highlight-layer');
+const cursorPosEl = document.getElementById('cursor-pos');
+const selectionInfoEl = document.getElementById('selection-info');
+const tabsContainer = document.getElementById('tabs-container');
+
+export function getEditor() { return editorEl; }
+export function getActiveContent() {
+  const tab = state.tabs.find(t => t.id === state.activeTabId);
+  return tab ? tab.content : (editorEl?.value || '');
+}
+export function setActiveContent(value) {
+  const tab = state.tabs.find(t => t.id === state.activeTabId);
+  if (tab) {
+    tab.content = value;
+    tab.dirty = true;
+    updateTabDirty(tab.id);
+  }
+  updateLineNumbers();
+  updateHighlight();
+  updateCursorInfo();
+}
+export function getActiveTab() {
+  return state.tabs.find(t => t.id === state.activeTabId);
+}
+
+function tabFromEditor() {
+  const tab = state.tabs.find(t => t.id === state.activeTabId);
+  if (tab && editorEl) tab.content = editorEl.value;
+}
+
+function editorFromTab() {
+  const welcomeScreen = document.getElementById('welcome-screen');
+  const editorContainer = document.getElementById('editor-container');
+  const tab = state.tabs.find(t => t.id === state.activeTabId);
+
+  if (!tab) {
+    if (welcomeScreen) welcomeScreen.style.display = 'flex';
+    if (editorContainer) editorContainer.style.display = 'none';
+    return;
+  }
+
+  if (welcomeScreen) welcomeScreen.style.display = 'none';
+  if (editorContainer) editorContainer.style.display = 'flex';
+
+  const content = tab ? tab.content : '';
+  if (editorEl) editorEl.value = content;
+  updateLineNumbers();
+  updateHighlight();
+  updateCursorInfo();
+}
+
+export function updateLineNumbers() {
+  if (!lineNumbersEl) return;
+  const text = getActiveContent();
+  const count = Math.max(1, text.split('\n').length);
+  lineNumbersEl.innerHTML = Array.from({ length: count }, (_, i) => i + 1).join('<br>');
+}
+
+export function updateHighlight() {
+  if (!highlightLayer) return;
+  const text = getActiveContent();
+  highlightLayer.innerHTML = highlightCimple(text).replace(/\n/g, '<br>');
+}
+
+export function updateCursorInfo() {
+  if (!cursorPosEl || !editorEl) return;
+  const text = getActiveContent();
+  const start = editorEl.selectionStart;
+  const end = editorEl.selectionEnd;
+  const lines = text.substring(0, start).split('\n');
+  const line = lines.length;
+  const col = lines[lines.length - 1].length + 1;
+  cursorPosEl.textContent = `Ln ${line}, Col ${col}`;
+  if (selectionInfoEl) {
+    if (start !== end) {
+      const selLines = text.substring(start, end).split('\n');
+      selectionInfoEl.style.display = 'inline';
+      selectionInfoEl.textContent = selLines.length > 1 ? `${selLines.length} lines selected` : `${end - start} selected`;
+    } else {
+      selectionInfoEl.style.display = 'none';
+    }
+  }
+}
+
+export function updateTabDirty(tabId) {
+  const tabEl = tabsContainer?.querySelector(`.tab[data-id="${tabId}"]`);
+  if (!tabEl) return;
+  const tab = state.tabs.find(t => t.id === tabId);
+  const dirtyEl = tabEl.querySelector('.tab-dirty');
+  if (dirtyEl) dirtyEl.style.display = tab?.dirty ? 'inline' : 'none';
+}
+
+export function renderTabs() {
+  if (!tabsContainer) return;
+  tabsContainer.innerHTML = state.tabs.map(t => `
+    <div class="tab ${t.id === state.activeTabId ? 'active' : ''}" data-id="${t.id}">
+      <span class="tab-icon">cimple</span>
+      <span class="tab-title">${escapeHtml(t.title)}</span>
+      <span class="tab-dirty" style="display: ${t.dirty ? 'inline' : 'none'}">●</span>
+      <span class="tab-close">×</span>
+    </div>
+  `).join('');
+  tabsContainer.querySelectorAll('.tab').forEach(el => {
+    const id = el.dataset.id;
+    el.addEventListener('click', (e) => {
+      if (e.target.classList.contains('tab-close')) closeTab(id);
+      else switchTab(id);
+    });
+  });
+}
+
+export function switchTab(id) {
+  if (id === state.activeTabId) return;
+  tabFromEditor();
+  state.activeTabId = id;
+  renderTabs();
+  editorFromTab();
+  refreshGitStatus();
+  document.dispatchEvent(new CustomEvent('tab-switched'));
+}
+
+export function closeTab(id) {
+  const idx = state.tabs.findIndex(t => t.id === id);
+  if (idx === -1) return;
+  tabFromEditor();
+  state.tabs.splice(idx, 1);
+  if (state.tabs.length === 0) {
+    state.activeTabId = null;
+  } else if (state.activeTabId === id) {
+    state.activeTabId = state.tabs[Math.max(0, idx - 1)].id;
+  }
+  renderTabs();
+  editorFromTab();
+  refreshGitStatus();
+}
+
+export function addTab(title = null, options = {}) {
+  tabFromEditor();
+  const id = options.id || 'tab-' + Date.now();
+  const title_ = title || `Untitled-${state.tabs.length + 1}`;
+  state.tabs.push({
+    id,
+    title: title_,
+    path: options.path || null,
+    content: options.content ?? '',
+    dirty: options.dirty ?? false
+  });
+  state.activeTabId = id;
+  renderTabs();
+  editorFromTab();
+  return id;
+}
+
+export function openTab(tab) {
+  const existing = state.tabs.find(t => t.path && t.path === tab.path);
+  if (existing) {
+    switchTab(existing.id);
+    return;
+  }
+  addTab(tab.title, tab);
+}
+
+export async function refreshGitStatus() {
+  const { ipcRenderer } = require('electron');
+  const cwd = state.workspacePath;
+  if (!cwd) {
+    state.gitBranch = null;
+    state.gitStatus = null;
+    updateGitUI();
+    return;
+  }
+  try {
+    const isRepo = await ipcRenderer.invoke('git-is-repo', cwd);
+    if (!isRepo) {
+      state.gitBranch = null;
+      state.gitStatus = null;
+    } else {
+      state.gitBranch = await ipcRenderer.invoke('git-branch', cwd);
+      state.gitStatus = await ipcRenderer.invoke('git-status', cwd);
+    }
+  } catch {
+    state.gitBranch = null;
+    state.gitStatus = null;
+  }
+  updateGitUI();
+}
+
+function updateGitUI() {
+  const branchEl = document.getElementById('git-branch');
+  if (branchEl) branchEl.textContent = state.gitBranch ? `⎇ ${state.gitBranch}` : '';
+}
+
+// Sync scroll
+if (editorEl) {
+  editorEl.addEventListener('scroll', () => {
+    if (lineNumbersEl) lineNumbersEl.scrollTop = editorEl.scrollTop;
+    if (highlightLayer) {
+      highlightLayer.scrollTop = editorEl.scrollTop;
+      highlightLayer.scrollLeft = editorEl.scrollLeft;
+    }
+  });
+}
+
+export { tabFromEditor, editorFromTab };
