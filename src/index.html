@@ -27,6 +27,18 @@
       </svg>
       <span>Workspace</span>
     </div>
+    <div class="workspace-summary" id="workspace-summary">
+      <div class="workspace-info">
+        <span class="workspace-path" id="workspace-path">No folder opened</span>
+        <span class="workspace-badge" id="workspace-branch">No branch</span>
+        <span class="workspace-status" id="workspace-status">Not a repo</span>
+      </div>
+      <div class="workspace-actions">
+        <button class="icon-btn" id="workspace-reveal-btn" title="Reveal in Explorer">⇪</button>
+        <button class="icon-btn" id="workspace-refresh-btn" title="Refresh Git">⟲</button>
+        <button class="icon-btn" id="workspace-open-btn" title="Open Folder">📁</button>
+      </div>
+    </div>
     <div class="layout-controls">
       <button class="icon-btn" id="toggle-sidebar-btn" title="Toggle Sidebar">◫</button>
     </div>
@@ -105,14 +117,51 @@
         </div>
         <div id="source-view" class="sidebar-view">
           <div class="source-panel">
-            <p class="source-hint">Git changes appear here when a folder is opened.</p>
+            <div class="source-panel-header">
+              <span>Source Control</span>
+              <button class="btn-small" id="source-refresh-btn">Refresh</button>
+            </div>
             <div id="source-list" class="source-list"></div>
           </div>
         </div>
         <div id="run-view" class="sidebar-view">
           <div class="run-panel">
-            <p class="run-hint">Run your Cimple program. Open a file or run the current buffer.</p>
-            <button class="btn-primary" id="run-btn" title="Run current file or buffer">Run</button>
+            <p class="run-hint">Run your Cimple program. Configure the entry file and CLI arguments below.</p>
+            <div class="run-config-card">
+              <div class="run-config-row">
+                <label for="run-entry-select">Entry File</label>
+                <div class="run-entry-row">
+                  <select id="run-entry-select">
+                    <option value="">Select a file</option>
+                  </select>
+                  <button class="btn-small" id="run-browse-entry">Browse...</button>
+                </div>
+              </div>
+              <div class="run-config-row">
+                <label for="run-args-input">CLI Arguments</label>
+                <input type="text" id="run-args-input" class="run-args-input" placeholder="e.g. --mode debug" />
+              </div>
+              <div class="run-config-row">
+                <label for="run-cwd-input">Working Directory</label>
+                <div class="run-cwd-row">
+                  <input type="text" id="run-cwd-input" class="run-cwd-input" placeholder="Workspace root or custom path" />
+                  <button class="btn-small" id="run-use-workspace-btn">Use workspace</button>
+                </div>
+              </div>
+              <div class="run-footer">
+                <button class="btn-primary" id="run-btn" title="Run configured file">Run</button>
+                <span id="run-last-result" class="run-last-result">Awaiting run</span>
+              </div>
+            </div>
+            <div class="run-history-card">
+              <div class="run-history-header">
+                <span>Run History</span>
+                <button class="btn-small" id="run-history-clear">Clear</button>
+              </div>
+              <div class="run-history-list" id="run-history-list">
+                <p class="run-history-empty">No runs yet.</p>
+              </div>
+            </div>
           </div>
         </div>
         <div id="extensions-view" class="sidebar-view">

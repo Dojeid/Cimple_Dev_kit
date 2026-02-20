@@ -3,6 +3,7 @@
  */
 import { state } from './state.js';
 import * as editor from './editor.js';
+import * as workspace from './workspace.js';
 
 const { ipcRenderer } = require('electron');
 const path = require('path');
@@ -61,21 +62,19 @@ function escapeHtml(t) {
 }
 
 export async function openFolder() {
-  const path = await ipcRenderer.invoke('open-folder');
-  if (!path) return;
-  state.workspacePath = path;
+  const newPath = await ipcRenderer.invoke('open-folder');
+  if (!newPath) return;
+  await workspace.setWorkspacePath(newPath);
   const treeEl = document.getElementById('file-tree');
   const emptyEl = document.getElementById('explorer-empty');
   if (treeEl && emptyEl) {
     emptyEl.style.display = 'none';
     treeEl.style.display = 'block';
     treeEl.innerHTML = '';
-    await loadDir(path, treeEl);
+    await loadDir(newPath, treeEl);
   }
   document.getElementById('sidebar-title').textContent = 'EXPLORER';
-  editor.refreshGitStatus();
-  const git = await import('./git.js');
-  git.refreshSourceList();
+  workspace.notify('folder-refreshed');
 }
 
 export async function openFile(filePath) {
@@ -128,7 +127,5 @@ export async function refreshFolder() {
     treeEl.innerHTML = '';
     await loadDir(path, treeEl);
   }
-  editor.refreshGitStatus();
-  const git = await import('./git.js');
-  git.refreshSourceList();
+  await workspace.refreshGit();
 }

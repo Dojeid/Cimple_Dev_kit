@@ -160,20 +160,23 @@ ipcMain.handle('git-is-repo', async (_, cwd) => {
 });
 
 // Run Cimple (placeholder - user replaces 'python' with cimple compiler path)
-ipcMain.handle('run-cimple', async (_, filePath, cwd) => {
-  const file = filePath || '';
+ipcMain.handle('run-cimple', async (_, filePath, options = {}) => {
+  const entry = filePath || '';
+  const args = Array.isArray(options.args) ? options.args : [];
   const cmd = process.platform === 'win32' ? 'python' : 'python3';
-  const dir = cwd || (file ? path.dirname(file) : process.cwd()) || process.cwd();
+  const dir = options.cwd || (entry ? path.dirname(entry) : process.cwd()) || process.cwd();
+  const env = { ...process.env, ...(options.env || {}) };
   return new Promise((resolve, reject) => {
-    const proc = spawn(cmd, [file], {
+    const spawnArgs = entry ? [entry, ...args] : [...args];
+    const proc = spawn(cmd, spawnArgs, {
       cwd: dir,
-      env: process.env
+      env
     });
     let out = '';
     let err = '';
     proc.stdout.on('data', (d) => { out += d; mainWindow?.webContents?.send('run-output', d.toString()); });
     proc.stderr.on('data', (d) => { err += d; mainWindow?.webContents?.send('run-output', d.toString()); });
-    proc.on('close', (code) => resolve({ code, stdout: out, stderr: err }));
+    proc.on('close', (code) => resolve({ code, stdout: out, stderr: err, entryPath: entry, args, cwd: dir }));
     proc.on('error', reject);
   });
 });

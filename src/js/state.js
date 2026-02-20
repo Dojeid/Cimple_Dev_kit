@@ -29,4 +29,14 @@ export const state = {
   // Auto-save
   autoSaveDelay: 1000,
   autoSaveEnabled: false,
+
+  // Run configuration
+  runConfig: {
+    entryPath: '',
+    args: '',
+    cwd: '',
+    useWorkspaceCwd: true,
+    lastResult: null,
+  },
+  runHistory: [],
 };

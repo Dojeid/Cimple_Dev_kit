@@ -116,6 +116,7 @@ export function renderTabs() {
       else switchTab(id);
     });
   });
+  document.dispatchEvent(new CustomEvent('tabs-changed'));
 }
 
 export function switchTab(id) {
@@ -175,7 +176,13 @@ export async function refreshGitStatus() {
   if (!cwd) {
     state.gitBranch = null;
     state.gitStatus = null;
-    updateGitUI();
+    document.dispatchEvent(new CustomEvent('git-status-updated', {
+      detail: {
+        branch: state.gitBranch,
+        status: state.gitStatus,
+        path: state.workspacePath,
+      }
+    }));
     return;
   }
   try {
@@ -191,12 +198,13 @@ export async function refreshGitStatus() {
     state.gitBranch = null;
     state.gitStatus = null;
   }
-  updateGitUI();
-}
-
-function updateGitUI() {
-  const branchEl = document.getElementById('git-branch');
-  if (branchEl) branchEl.textContent = state.gitBranch ? `⎇ ${state.gitBranch}` : '';
+  document.dispatchEvent(new CustomEvent('git-status-updated', {
+    detail: {
+      branch: state.gitBranch,
+      status: state.gitStatus,
+      path: state.workspacePath,
+    }
+  }));
 }
 
 // Sync scroll

@@ -16,10 +16,17 @@ import * as breadcrumbs from './breadcrumbs.js';
 import * as autocomplete from './autocomplete.js';
 import * as autosave from './autosave.js';
 import * as multiCursor from './multi-cursor.js';
+import * as workspace from './workspace.js';
 import { escapeHtml } from './syntax.js';
 
 const editorEl = document.getElementById('code-editor');
 const contextMenu = document.getElementById('context-menu');
+const workspacePathEl = document.getElementById('workspace-path');
+const workspaceBranchEl = document.getElementById('workspace-branch');
+const workspaceStatusEl = document.getElementById('workspace-status');
+const workspaceOpenBtn = document.getElementById('workspace-open-btn');
+const workspaceRefreshBtn = document.getElementById('workspace-refresh-btn');
+const workspaceRevealBtn = document.getElementById('workspace-reveal-btn');
 
 // Init state - start empty to show welcome screen
 state.tabs = [];
@@ -32,7 +39,39 @@ panels.init();
 terminal.init();
 minimap.init();
 multiCursor.init();
+run.init();
+workspace.onWorkspaceChange(() => {
+  updateWorkspaceHeader();
+});
 
+function updateWorkspaceHeader() {
+  const path = state.workspacePath;
+  const branch = state.gitBranch;
+  const dirty = Boolean(state.gitStatus);
+  if (workspacePathEl) workspacePathEl.textContent = path || 'No folder opened';
+  if (workspaceBranchEl) workspaceBranchEl.textContent = branch ? `⎇ ${branch}` : 'No branch';
+  if (workspaceStatusEl) {
+    if (!path) {
+      workspaceStatusEl.textContent = 'Not a repo';
+      workspaceStatusEl.classList.remove('clean', 'dirty');
+    } else if (!branch) {
+      workspaceStatusEl.textContent = 'Not a repo';
+      workspaceStatusEl.classList.remove('clean', 'dirty');
+    } else {
+      workspaceStatusEl.textContent = dirty ? 'Dirty' : 'Clean';
+      workspaceStatusEl.classList.toggle('dirty', dirty);
+      workspaceStatusEl.classList.toggle('clean', !dirty);
+    }
+  }
+}
+
+workspaceOpenBtn?.addEventListener('click', () => fileExplorer.openFolder());
+workspaceRefreshBtn?.addEventListener('click', () => workspace.refreshGit());
+workspaceRevealBtn?.addEventListener('click', () => {
+  document.querySelector('.activity-item[data-view="explorer"]')?.click();
+  fileExplorer.refreshFolder();
+});
+document.getElementById('source-refresh-btn')?.addEventListener('click', () => workspace.refreshGit());
 // Editor input handler
 if (editorEl) {
   editorEl.addEventListener('input', () => {
@@ -238,3 +277,4 @@ editor.editorFromTab();
 breadcrumbs.update();
 minimap.update();
 editor.refreshGitStatus();
+workspace.notify('bootstrap');
